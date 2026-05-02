@@ -10,7 +10,7 @@
     "start": "next start --hostname 0.0.0.0 --port 5174"
   },
   "dependencies": {
-    "@synthify/proto-ts": "file:../../../packages/proto-ts",
+    "@synthify/proto-ts": "workspace:*",
     "@bufbuild/protobuf": "^2.11.0",
     "@connectrpc/connect": "^2.1.1",
     "@connectrpc/connect-web": "^2.1.1",

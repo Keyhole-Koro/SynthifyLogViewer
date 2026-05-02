@@ -16,8 +16,7 @@
     "ignoreDeprecations": "6.0",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
-      "@synthify/proto-ts/*": ["../../../packages/proto-ts/*"]
+      "@/*": ["./src/*"]
     },
     "plugins": [{ "name": "next" }]
   },

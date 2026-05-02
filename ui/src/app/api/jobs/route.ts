@@ -4,6 +4,16 @@ import { JobService } from '@synthify/proto-ts/gen/synthify/tree/v1/job_pb';
 
 export async function GET() {
   const jobClient = createRPCClient(JobService);
-  const res = await jobClient.listAllJobs({});
-  return NextResponse.json({ jobs: res.jobs ?? [] });
+  try {
+    const res = await Promise.race([
+      jobClient.listAllJobs({}),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('listAllJobs timed out')), 3000);
+      }),
+    ]);
+    return NextResponse.json({ jobs: res.jobs ?? [] });
+  } catch (error) {
+    console.error('log-viewer jobs fallback:', error);
+    return NextResponse.json({ jobs: [] });
+  }
 }
