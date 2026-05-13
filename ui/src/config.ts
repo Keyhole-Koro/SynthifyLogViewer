@@ -1,15 +1,16 @@
 import { z } from 'zod';
 
 const envSchema = z.object({
-  NEXT_PUBLIC_API_BASE_URL: z.string().url().default('http://localhost:8080'),
-  INTERNAL_API_BASE_URL: z.string().url().optional(),
+  // BFF (Next.js Route Handlers) は LOG_VIEWER_DATABASE_URL で Postgres を直接参照する。
+  // log_viewer ロールに GRANT SELECT が与えられた read-only DSN を指す想定
+  // (db/init/004_log_viewer_role.sql)。
+  LOG_VIEWER_DATABASE_URL: z
+    .string()
+    .default('postgres://log_viewer@127.0.0.1:5432/synthify?sslmode=disable'),
 });
 
-// In Next.js, process.env.NEXT_PUBLIC_* variables are replaced at build time.
-// We need to explicitly access them.
 const processEnv = {
-  NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-  INTERNAL_API_BASE_URL: process.env.INTERNAL_API_BASE_URL,
+  LOG_VIEWER_DATABASE_URL: process.env.LOG_VIEWER_DATABASE_URL,
 };
 
 const parsed = envSchema.safeParse(processEnv);

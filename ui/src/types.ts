@@ -1,40 +1,26 @@
-export interface JobLog {
-  timestamp: string;
-  level: 'INFO' | 'WARN' | 'ERROR' | string;
-  event: string;
-  message: string;
-  detailJson: string;
-  source: 'system' | 'tool' | string;
-  sourceId: string;
-  jobId: string;
-  documentId: string;
-  workspaceId: string;
-}
+import type { components } from './generated/openapi';
 
-export interface JobLogJob {
-  jobId: string;
-  status: number;
-  createdAt: string;
-  logs: JobLog[];
-}
-
-export interface JobLogGroup {
-  workspaceId: string;
-  documentId: string;
-  jobs: JobLogJob[];
-}
+export type JobSummary = components['schemas']['JobSummary'];
+export type JobLog = components['schemas']['JobLog'];
+export type JobLogJob = components['schemas']['RelatedJob'];
+export type JobLogGroup = components['schemas']['RelatedJobGroup'];
+export type ListJobLogsResponse = components['schemas']['ListJobLogsResponse'];
+export type ListJobsResponse = components['schemas']['ListJobsResponse'];
+export type ListRelatedJobLogsRequest = components['schemas']['ListRelatedJobLogsRequest'];
+export type ListRelatedJobLogsResponse = components['schemas']['ListRelatedJobLogsResponse'];
+export type SearchJobLogsRequest = components['schemas']['SearchJobLogsRequest'];
 
 export interface JobLogFilters {
   query: string;
   levels: string[];
   events: string[];
-  scope: 'job' | 'document' | 'workspace';
+  scope: components['schemas']['RelatedScope'];
   fromTimestamp?: string;
   toTimestamp?: string;
 }
 
 export interface JobLogDataSource {
-  listJobLogs(jobId: string, pageToken?: string): Promise<{ logs: JobLog[], nextPageToken: string }>;
-  searchJobLogs(filters: JobLogFilters, ids: { jobId: string; documentId?: string; workspaceId?: string }, pageToken?: string): Promise<{ logs: JobLog[], nextPageToken: string }>;
-  listRelatedJobLogs(scope: JobLogFilters['scope'], ids: { jobId: string; documentId?: string; workspaceId?: string }, pageToken?: string): Promise<{ groups: JobLogGroup[], nextPageToken: string }>;
+  listJobLogs(jobId: string, pageToken?: string): Promise<ListJobLogsResponse>;
+  searchJobLogs(filters: JobLogFilters, ids: { jobId: string; documentId?: string; workspaceId?: string }, pageToken?: string): Promise<ListJobLogsResponse>;
+  listRelatedJobLogs(scope: JobLogFilters['scope'], ids: { jobId: string; documentId?: string; workspaceId?: string }, pageToken?: string): Promise<ListRelatedJobLogsResponse>;
 }

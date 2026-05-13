@@ -3,17 +3,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { createJobLogDataSource } from '@/lib/data-source';
 import { JobLogViewer } from '../JobLogViewer';
-
-interface Job {
-  jobId: string;
-  documentId: string;
-  workspaceId: string;
-  status: number;
-  createdAt: string;
-}
+import type { JobSummary, ListJobsResponse } from '../types';
 
 export function AuditPage() {
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -22,7 +15,7 @@ export function AuditPage() {
   useEffect(() => {
     fetch('/api/jobs')
       .then((r) => r.json())
-      .then((data) => setJobs(data.jobs ?? []))
+      .then((data: Partial<ListJobsResponse>) => setJobs(data.jobs ?? []))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

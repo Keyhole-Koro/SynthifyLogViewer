@@ -1,17 +1,28 @@
-import { createRPCClient } from './connect';
-import { JobService, RelatedLogScope } from '@synthify/proto-ts/gen/synthify/tree/v1/job_pb';
-import type { JobLog, JobLogDataSource, JobLogFilters, JobLogGroup, JobLogJob } from '../types';
+// log-viewer はクライアント側からは API (Connect/gRPC) を叩かず、
+// 同一 Next.js アプリの Route Handlers (/api/jobs/...) を経由して
+// サーバーサイドで Postgres を read-only ロールで直接参照する。
+// 詳細: docs/improvements/log-viewer-direct-db.md
 
-const jobClient = createRPCClient(JobService);
+import type {
+  JobLogDataSource,
+  JobLogFilters,
+  ListJobLogsResponse,
+  ListRelatedJobLogsRequest,
+  ListRelatedJobLogsResponse,
+  SearchJobLogsRequest,
+} from '../types';
 
 export function createJobLogDataSource(): JobLogDataSource {
   return {
     async listJobLogs(jobId, pageToken) {
-      const res = await jobClient.listJobLogs({ jobId, pageToken: pageToken ?? '' });
-      return { logs: (res.logs ?? []).map(toJobLog), nextPageToken: res.nextPageToken ?? '' };
+      const qs = pageToken ? `?page_token=${encodeURIComponent(pageToken)}` : '';
+      const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/logs${qs}`);
+      if (!res.ok) return { logs: [], nextPageToken: '' };
+      const body = (await res.json()) as Partial<ListJobLogsResponse>;
+      return { logs: body.logs ?? [], nextPageToken: body.nextPageToken ?? '' };
     },
     async searchJobLogs(filters, ids, pageToken) {
-      const res = await jobClient.searchJobLogs({
+      const requestBody: SearchJobLogsRequest = {
         query: filters.query,
         workspaceId: filters.scope === 'workspace' ? (ids.workspaceId ?? '') : '',
         documentId: filters.scope === 'document' ? (ids.documentId ?? '') : '',
@@ -21,54 +32,36 @@ export function createJobLogDataSource(): JobLogDataSource {
         fromTimestamp: filters.fromTimestamp ?? '',
         toTimestamp: filters.toTimestamp ?? '',
         pageToken: pageToken ?? '',
+      };
+      const res = await fetch('/api/jobs/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
       });
-      return { logs: (res.logs ?? []).map(toJobLog), nextPageToken: res.nextPageToken ?? '' };
+      if (!res.ok) return { logs: [], nextPageToken: '' };
+      const body = (await res.json()) as Partial<ListJobLogsResponse>;
+      return { logs: body.logs ?? [], nextPageToken: body.nextPageToken ?? '' };
     },
     async listRelatedJobLogs(scope, ids, pageToken) {
-      const res = await jobClient.listRelatedJobLogs({
-        scope: toRelatedScope(scope),
+      const requestBody: ListRelatedJobLogsRequest = {
+        scope,
         jobId: scope === 'job' ? ids.jobId : '',
         documentId: scope === 'document' ? (ids.documentId ?? '') : '',
         workspaceId: scope === 'workspace' ? (ids.workspaceId ?? '') : '',
         pageToken: pageToken ?? '',
+      };
+      const res = await fetch('/api/jobs/related', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
       });
-      return { groups: (res.groups ?? []).map(toJobLogGroup), nextPageToken: res.nextPageToken ?? '' };
+      if (!res.ok) return { groups: [], nextPageToken: '' };
+      const body = (await res.json()) as Partial<ListRelatedJobLogsResponse>;
+      return { groups: body.groups ?? [], nextPageToken: body.nextPageToken ?? '' };
     },
   };
 }
 
-function toRelatedScope(scope: JobLogFilters['scope']) {
-  switch (scope) {
-    case 'job': return RelatedLogScope.JOB;
-    case 'document': return RelatedLogScope.DOCUMENT;
-    case 'workspace': return RelatedLogScope.WORKSPACE;
-    default: return RelatedLogScope.UNSPECIFIED;
-  }
-}
-
-function toJobLog(log: {
-  timestamp: string; level: string; event: string; message: string;
-  detailJson: string; source: string; sourceId: string;
-  jobId: string; documentId: string; workspaceId: string;
-}): JobLog {
-  return {
-    timestamp: log.timestamp, level: log.level, event: log.event,
-    message: log.message, detailJson: log.detailJson, source: log.source,
-    sourceId: log.sourceId, jobId: log.jobId, documentId: log.documentId,
-    workspaceId: log.workspaceId,
-  };
-}
-
-function toJobLogJob(job: {
-  jobId: string; status: number; createdAt: string;
-  logs: Array<{ timestamp: string; level: string; event: string; message: string; detailJson: string; source: string; sourceId: string; jobId: string; documentId: string; workspaceId: string }>;
-}): JobLogJob {
-  return { jobId: job.jobId, status: job.status, createdAt: job.createdAt, logs: (job.logs ?? []).map(toJobLog) };
-}
-
-function toJobLogGroup(group: {
-  workspaceId: string; documentId: string;
-  jobs: Array<{ jobId: string; status: number; createdAt: string; logs: Array<{ timestamp: string; level: string; event: string; message: string; detailJson: string; source: string; sourceId: string; jobId: string; documentId: string; workspaceId: string }> }>;
-}): JobLogGroup {
-  return { workspaceId: group.workspaceId, documentId: group.documentId, jobs: (group.jobs ?? []).map(toJobLogJob) };
-}
+// JobLogFilters はクライアントから受け取った値をそのまま転送するだけなので
+// 直接の参照は不要だが、tree-shaking と型安全のため明示的に再エクスポート。
+export type { JobLogFilters };
