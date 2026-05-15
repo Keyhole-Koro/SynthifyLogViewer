@@ -3,17 +3,21 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { createJobLogDataSource } from '@/lib/data-source';
 import { JobLogViewer } from '../JobLogViewer';
+import { JobTrace } from './JobTrace';
 import type { JobSummary, ListJobsResponse } from '../types';
 
 interface AuditPageProps {
   embedded?: boolean;
+  forcedJobId?: string | null;
+  onJobSelect?: (jobId: string) => void;
 }
 
-export function AuditPage({ embedded = false }: AuditPageProps) {
+export function AuditPage({ embedded = false, forcedJobId, onJobSelect }: AuditPageProps) {
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [mainTab, setMainTab] = useState<'logs' | 'trace'>('logs');
   const dataSource = useMemo(() => createJobLogDataSource(), []);
 
   useEffect(() => {
@@ -23,6 +27,20 @@ export function AuditPage({ embedded = false }: AuditPageProps) {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // 外部からジョブIDが指定されたら選択状態を同期
+  useEffect(() => {
+    if (forcedJobId) {
+      setSelectedJobId(forcedJobId);
+      setMainTab('logs');
+    }
+  }, [forcedJobId]);
+
+  function selectJob(jobId: string) {
+    setSelectedJobId(jobId);
+    setMainTab('logs');
+    onJobSelect?.(jobId);
+  }
 
   const filteredJobs = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -75,7 +93,7 @@ export function AuditPage({ embedded = false }: AuditPageProps) {
             filteredJobs.map((job) => (
               <button
                 key={job.jobId}
-                onClick={() => setSelectedJobId(job.jobId)}
+                onClick={() => selectJob(job.jobId)}
                 className={`w-full text-left p-4 border-b border-stone-50 transition-colors hover:bg-stone-50 ${selectedJobId === job.jobId ? 'bg-stone-100' : ''}`}
               >
                 <div className="flex justify-between items-start mb-1">
@@ -99,14 +117,37 @@ export function AuditPage({ embedded = false }: AuditPageProps) {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden bg-white">
         {selectedJob ? (
-          <div className="flex-1 overflow-hidden">
-            <JobLogViewer
-              jobId={selectedJob.jobId}
-              documentId={selectedJob.documentId}
-              workspaceId={selectedJob.workspaceId}
-              dataSource={dataSource}
-            />
-          </div>
+          <>
+            {/* Logs / Trace tab bar */}
+            <div className="flex items-center gap-1 px-4 pt-3 pb-0 border-b border-stone-200 shrink-0">
+              {(['logs', 'trace'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setMainTab(t)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-t transition-colors capitalize ${
+                    mainTab === t
+                      ? 'bg-white border border-b-white border-stone-200 -mb-px text-stone-800'
+                      : 'text-stone-400 hover:text-stone-600'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-hidden">
+              {mainTab === 'logs' ? (
+                <JobLogViewer
+                  jobId={selectedJob.jobId}
+                  documentId={selectedJob.documentId}
+                  workspaceId={selectedJob.workspaceId}
+                  dataSource={dataSource}
+                />
+              ) : (
+                <JobTrace jobId={selectedJob.jobId} />
+              )}
+            </div>
+          </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-stone-300 p-10 text-center">
             <svg className="w-12 h-12 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">

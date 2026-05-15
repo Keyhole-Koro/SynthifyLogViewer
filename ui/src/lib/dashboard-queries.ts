@@ -31,6 +31,25 @@ export interface TopRetryJob {
   retryCount: number;
 }
 
+export interface ErrorMessage {
+  message: string;
+  count: number;
+}
+
+export interface MimeTypeFailure {
+  mimeType: string;
+  failed: number;
+  total: number;
+}
+
+export interface ActiveFailure {
+  jobId: string;
+  documentId: string;
+  currentStage: string;
+  errorMessage: string;
+  updatedAt: string;
+}
+
 export interface JobHealthData {
   totalJobs: number;
   successRate: number;
@@ -39,12 +58,21 @@ export interface JobHealthData {
   byDay: JobStatusByDay[];
   stageFailures: StageFailure[];
   topRetryJobs: TopRetryJob[];
+  errorMessages: ErrorMessage[];
+  byMimeType: MimeTypeFailure[];
+  activeFailures: ActiveFailure[];
 }
 
 export async function queryJobHealth(pool: Pool, period: Period): Promise<JobHealthData> {
   const since = periodInterval(period);
 
-  const [overview, byDay, stageFailures, topRetry] = await Promise.all([
+  // today は時間単位、それ以外は日単位
+  const dateTrunc = period === 'today' ? 'hour' : 'day';
+  const dateLabel = period === 'today'
+    ? `to_char(date_trunc('hour', created_at), 'HH24:00')`
+    : `date_trunc('day', created_at)::date::text`;
+
+  const [overview, byDay, stageFailures, topRetry, errorMessages, byMimeType, activeFailures] = await Promise.all([
     pool.query(`
       SELECT
         COUNT(*)                                                         AS total,
@@ -60,15 +88,15 @@ export async function queryJobHealth(pool: Pool, period: Period): Promise<JobHea
     `),
     pool.query(`
       SELECT
-        date_trunc('day', created_at)::date::text AS date,
+        ${dateLabel} AS date,
         COUNT(*) FILTER (WHERE status = 'succeeded') AS succeeded,
         COUNT(*) FILTER (WHERE status = 'failed')    AS failed,
         COUNT(*) FILTER (WHERE status = 'running')   AS running,
         COUNT(*) FILTER (WHERE status = 'queued')    AS queued
       FROM v_processing_jobs
       WHERE created_at >= ${since}
-      GROUP BY 1
-      ORDER BY 1
+      GROUP BY date_trunc('${dateTrunc}', created_at)
+      ORDER BY date_trunc('${dateTrunc}', created_at)
     `),
     pool.query(`
       SELECT current_stage AS stage, COUNT(*) AS count
@@ -84,6 +112,33 @@ export async function queryJobHealth(pool: Pool, period: Period): Promise<JobHea
       WHERE retry_count > 0 AND created_at >= ${since}
       ORDER BY retry_count DESC
       LIMIT 10
+    `),
+    pool.query(`
+      SELECT error_message AS message, COUNT(*) AS count
+      FROM v_processing_jobs
+      WHERE status = 'failed' AND error_message <> '' AND created_at >= ${since}
+      GROUP BY error_message
+      ORDER BY count DESC
+      LIMIT 10
+    `),
+    pool.query(`
+      SELECT
+        d.mime_type,
+        COUNT(*) FILTER (WHERE j.status = 'failed') AS failed,
+        COUNT(*) AS total
+      FROM v_processing_jobs j
+      JOIN v_documents d ON d.document_id = j.document_id
+      WHERE j.created_at >= ${since}
+      GROUP BY d.mime_type
+      ORDER BY failed DESC
+      LIMIT 10
+    `),
+    pool.query(`
+      SELECT job_id, document_id, current_stage, error_message, updated_at
+      FROM v_processing_jobs
+      WHERE status = 'failed' AND created_at >= ${since}
+      ORDER BY updated_at DESC
+      LIMIT 20
     `),
   ]);
 
@@ -111,6 +166,22 @@ export async function queryJobHealth(pool: Pool, period: Period): Promise<JobHea
       jobId: String(r.job_id),
       documentId: String(r.document_id),
       retryCount: Number(r.retry_count),
+    })),
+    errorMessages: errorMessages.rows.map((r) => ({
+      message: String(r.message),
+      count: Number(r.count),
+    })),
+    byMimeType: byMimeType.rows.map((r) => ({
+      mimeType: String(r.mime_type),
+      failed: Number(r.failed),
+      total: Number(r.total),
+    })),
+    activeFailures: activeFailures.rows.map((r) => ({
+      jobId: String(r.job_id),
+      documentId: String(r.document_id),
+      currentStage: String(r.current_stage),
+      errorMessage: String(r.error_message),
+      updatedAt: r.updated_at instanceof Date ? r.updated_at.toISOString() : String(r.updated_at),
     })),
   };
 }
