@@ -18,7 +18,10 @@ export function createJobLogDataSource(): JobLogDataSource {
       const res = await fetch(`/api/jobs/${encodeURIComponent(jobId)}/logs${qs}`);
       if (!res.ok) return { logs: [], nextPageToken: '' };
       const body = (await res.json()) as Partial<ListJobLogsResponse>;
-      return { logs: body.logs ?? [], nextPageToken: body.nextPageToken ?? '' };
+      return {
+        logs: Array.isArray(body.logs) ? body.logs : [],
+        nextPageToken: body.nextPageToken ?? '',
+      };
     },
     async searchJobLogs(filters, ids, pageToken) {
       const requestBody: SearchJobLogsRequest = {
@@ -39,7 +42,10 @@ export function createJobLogDataSource(): JobLogDataSource {
       });
       if (!res.ok) return { logs: [], nextPageToken: '' };
       const body = (await res.json()) as Partial<ListJobLogsResponse>;
-      return { logs: body.logs ?? [], nextPageToken: body.nextPageToken ?? '' };
+      return {
+        logs: Array.isArray(body.logs) ? body.logs : [],
+        nextPageToken: body.nextPageToken ?? '',
+      };
     },
     async listRelatedJobLogs(scope, ids, pageToken) {
       const requestBody: ListRelatedJobLogsRequest = {
@@ -56,7 +62,10 @@ export function createJobLogDataSource(): JobLogDataSource {
       });
       if (!res.ok) return { groups: [], nextPageToken: '' };
       const body = (await res.json()) as Partial<ListRelatedJobLogsResponse>;
-      return { groups: body.groups ?? [], nextPageToken: body.nextPageToken ?? '' };
+      return {
+        groups: Array.isArray(body.groups) ? body.groups : [],
+        nextPageToken: body.nextPageToken ?? '',
+      };
     },
   };
 }

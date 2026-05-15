@@ -262,23 +262,24 @@ function Flow({ logs }: { logs: JobLog[] }) {
 }
 
 function Related({ groups }: { groups: JobLogGroup[] }) {
-  if (groups.length === 0) return <Empty />;
+  const safeGroups = Array.isArray(groups) ? groups : [];
+  if (safeGroups.length === 0) return <Empty />;
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-5">
-      {groups.map((group) => (
+      {safeGroups.map((group) => (
         <section key={`${group.workspaceId}:${group.documentId}`} className="border-l border-stone-200 pl-4">
           <div className="mb-3">
             <h4 className="text-xs font-bold text-stone-800">{group.documentId}</h4>
             <p className="text-[10px] text-stone-400">{group.workspaceId}</p>
           </div>
           <div className="flex flex-col gap-4">
-            {group.jobs.map((job) => (
+            {(Array.isArray(group.jobs) ? group.jobs : []).map((job) => (
               <div key={job.jobId} className="rounded-md border border-stone-200 bg-white p-3">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-bold">{job.jobId}</span>
                   <span className="text-[10px] text-stone-400">{new Date(job.createdAt).toLocaleString()}</span>
                 </div>
-                <Timeline logs={job.logs} />
+                <Timeline logs={Array.isArray(job.logs) ? job.logs : []} />
               </div>
             ))}
           </div>

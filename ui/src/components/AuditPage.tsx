@@ -5,7 +5,11 @@ import { createJobLogDataSource } from '@/lib/data-source';
 import { JobLogViewer } from '../JobLogViewer';
 import type { JobSummary, ListJobsResponse } from '../types';
 
-export function AuditPage() {
+interface AuditPageProps {
+  embedded?: boolean;
+}
+
+export function AuditPage({ embedded = false }: AuditPageProps) {
   const [jobs, setJobs] = useState<JobSummary[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -15,7 +19,7 @@ export function AuditPage() {
   useEffect(() => {
     fetch('/api/jobs')
       .then((r) => r.json())
-      .then((data: Partial<ListJobsResponse>) => setJobs(data.jobs ?? []))
+      .then((data: Partial<ListJobsResponse>) => setJobs(Array.isArray(data.jobs) ? data.jobs : []))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -35,12 +39,20 @@ export function AuditPage() {
   if (loading) return <div className="p-10 text-stone-400 text-sm">Loading...</div>;
 
   return (
-    <div className="flex h-screen bg-stone-50 overflow-hidden">
+    <div className={`flex bg-stone-50 overflow-hidden ${embedded ? 'h-full' : 'h-screen'}`}>
       {/* Sidebar */}
       <div className="w-80 border-r border-stone-200 bg-white flex flex-col">
         <div className="p-4 border-b border-stone-100 bg-stone-50/50">
           <div className="flex items-center justify-between mb-1">
             <h1 className="text-sm font-bold tracking-tight text-stone-800 uppercase">Log Viewer</h1>
+            {!embedded && (
+              <a
+                href="/dashboards"
+                className="text-[10px] px-2 py-0.5 rounded bg-stone-100 text-stone-500 hover:bg-stone-200 transition-colors font-medium"
+              >
+                BI
+              </a>
+            )}
           </div>
           <p className="text-[10px] text-stone-400 font-medium">Document Processing History</p>
           <div className="mt-4 relative">
